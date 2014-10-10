@@ -37,7 +37,7 @@ var Storage = {
 
             Monitor.log(savedData);
 
-            if(!_.isUndefined(savedData))
+            if(!_.isUndefined(savedData.dvachmon))
                 Threads.loadFromObjects(savedData.dvachmon.threads);
             else
                 Threads.loadFromObjects({});

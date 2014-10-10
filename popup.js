@@ -7,29 +7,40 @@ $(function(){
         render(response.threads);
 	});
 
+    var div_default_content =  $('#links-div').html();
+
     function render(threads) {
         var sorted = _.sortBy(threads, function(thread) { return -thread.unread; });
 
-        $('#links-div').empty();
+        var content_div = $('#links-div');
 
-        renderLinks(sorted);
+        if(sorted.length  == 0) {
+            content_div.html(div_default_content);
 
-        $('.read-btn').on('click',function(){
-            $(this).attr('src', 'ok_pending.png');
-            markAsRead( $(this).attr('thread-id') );
-            return false;
-        });
+        } else {
 
-        $('.update-btn').on('click',function(){
-            $(this).attr('src', 'reload_pending.png');
-            updateThread( $(this).attr('thread-id') );
-            return false;
-        });
+            content_div.empty();
 
-        $('.thread-link').on('click',function(){
+            renderLinks(sorted);
+
+            $('.read-btn').on('click', function () {
+                $(this).attr('src', 'ok_pending.png');
+                markAsRead($(this).attr('thread-id'));
+                return false;
+            });
+
+            $('.update-btn').on('click', function () {
+                $(this).attr('src', 'reload_pending.png');
+                updateThread($(this).attr('thread-id'));
+                return false;
+            });
+        }
+
+        $('.thread-link').on('click', function () {
             chrome.tabs.create({url: $(this).attr('href')});
             return false;
         });
+
     }
 
 	function markAsRead(num) {
