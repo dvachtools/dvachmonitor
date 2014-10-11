@@ -244,9 +244,7 @@ var Updater = {
      * */
 	getUpdates: function(threadMap) {
 
-        if(threadMap == undefined) {
-            throw new Error("welcome to undefined world");
-        }
+        assert(!_.isUndefined(threadMap), "welcome to undefined world");
 
         var thread = threadMap.toObject();
 
@@ -338,7 +336,7 @@ var Updater = {
                     set("not_found_errors", 0).
                     set("last_post", result.last_post);
         } else {
-            return threadMap;
+            return threadMap.set("errors", 0).set("not_found_errors", 0);
         }
     },
 

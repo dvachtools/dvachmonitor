@@ -88,7 +88,7 @@ $(function(){
 		var style = unreads > 0 ? "style='font-weight: bold'":"";
 
 
-        var errors_status = vsprintf("%s%s", [not_found_errors > 0 ? " 404 ":"", errors > 0 ? " <span style='color:red'>test</span> ":""]);
+        var errors_status = vsprintf("%s%s", [not_found_errors > 0 ? " 404 ":"", errors > 0 ? " <span style='color:red'>err</span> ":""]);
 
 		var markAsReadButton = unreads > 0 ? vsprintf(" <img src='images/ok.png' style='cursor:pointer;width: 12px; height: 12px' class=read-btn thread-id=%d>", [num]):"";
 
