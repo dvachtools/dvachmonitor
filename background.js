@@ -42,7 +42,7 @@ var Storage = {
             else
                 Threads.loadFromObjects({});
 
-func(Threads.getAll());
+            func(Threads.getAll());
         });
     }
 };
