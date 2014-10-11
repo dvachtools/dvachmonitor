@@ -1,39 +1,39 @@
 var Settings = {
-	minimumDelay: 10,
-	maximumPeriod: 600,
-	factor: 1.5,
+    minimumDelay: 10,
+    maximumPeriod: 600,
+    factor: 1.5,
     domain: "2ch.hk",
     count_threads: true
 };
 
 var MonitorData = {
     threadsMap: Immutable.Map({}),
-	debug: true
+    debug: true
 };
 
 var Monitor = {
-	log: function (msg) {
-		if(MonitorData.debug)
-			console.log(msg)
-	}
+    log: function (msg) {
+        if(MonitorData.debug)
+            console.log(msg)
+    }
 };
 
 var Storage = {
-	saveThreads: function() {
-		chrome.storage.local.set(
-			{
-				"dvachmon": {
-					settings: Settings,
-					threads: Threads.getAllAsObjects()
+    saveThreads: function() {
+        chrome.storage.local.set(
+            {
+                "dvachmon": {
+                    settings: Settings,
+                    threads: Threads.getAllAsObjects()
                 }
-			},
-			function(){
-				Monitor.log("saved to the storage");
-			});
-	},
+            },
+            function(){
+                Monitor.log("saved to the storage");
+            });
+    },
 
-	load: function( func ) {
-		chrome.storage.local.get("dvachmon", function(savedData) {
+    load: function( func ) {
+        chrome.storage.local.get("dvachmon", function(savedData) {
 
             Monitor.log(savedData);
 
@@ -42,9 +42,9 @@ var Storage = {
             else
                 Threads.loadFromObjects({});
 
-            func(Threads.getAll());
+func(Threads.getAll());
         });
-	}
+    }
 };
 
 (function(){
@@ -91,50 +91,50 @@ var Scheduler = {
         }
     },
 
-	unscheduleTask: function (num) {
+    unscheduleTask: function (num) {
         Monitor.log("Unscheduling " + num);
         this.clearListeners(num);
-		chrome.alarms.clear(num.toString(), function(wc){})
-	},
+        chrome.alarms.clear(num.toString(), function(wc){})
+    },
 
-	scheduleTask: function (num, func, delaySecs) {
-		Monitor.log("a task for " + num + " scheduled after " + secsToMins(delaySecs) + "minutes");
+    scheduleTask: function (num, func, delaySecs) {
+        Monitor.log("a task for " + num + " scheduled after " + secsToMins(delaySecs) + "minutes");
 
-		chrome.alarms.create(
-			num.toString(), {
-				'delayInMinutes': secsToMins(delaySecs)
-			});
+        chrome.alarms.create(
+            num.toString(), {
+                'delayInMinutes': secsToMins(delaySecs)
+            });
 
         var self = this;
 
-		var listener = function(alarm) {
-		    if (alarm.name == num.toString()) {
+        var listener = function(alarm) {
+            if (alarm.name == num.toString()) {
                 self.clearListeners(num);
-		        func();
-		    }
-		};
+                func();
+            }
+        };
 
         this.addListener(num, listener);
-	}
+    }
 };
 
 var Threads = {
     /** @returns {Immutable.Map}*/
-	getThread: function (num) {
-		return MonitorData.threadsMap.get(num.toString());
-	},
+    getThread: function (num) {
+        return MonitorData.threadsMap.get(num.toString());
+    },
 
-	deleteThread: function (num) {
+    deleteThread: function (num) {
         MonitorData.threadsMap = MonitorData.threadsMap.delete(num.toString());
         Storage.saveThreads();
-	},
+    },
 
     /**
      * Возвращает треды в виде Immutable.Map
      * @returns {Immutable.Map}*/
-	getAll: function() {
-		return MonitorData.threadsMap;
-	},
+    getAll: function() {
+        return MonitorData.threadsMap;
+    },
 
     /** Возвращает треды в виде js-объекта
      * @returns {Object}*/
@@ -147,7 +147,7 @@ var Threads = {
      * @returns {Immutable.Map}
      * @param {Immutable.Map} thread
      * */
-	pushThread: function(thread) {
+    pushThread: function(thread) {
 
         if(_.isUndefined(thread)) {
             throw new Error("Pushing undefined");
@@ -158,18 +158,18 @@ var Threads = {
         Storage.saveThreads();
 
         return thread;
-	},
+    },
 
     /** @returns {Boolean}*/
-	has: function(num) {
-		// return (num in MonitorData.threads);
-		return MonitorData.threadsMap.has(num.toString());
-	},
+    has: function(num) {
+        // return (num in MonitorData.threads);
+        return MonitorData.threadsMap.has(num.toString());
+    },
 
-	loadFromObjects: function(threadsObject) {
-		MonitorData.threadsMap = Immutable.fromJS(threadsObject);
+    loadFromObjects: function(threadsObject) {
+        MonitorData.threadsMap = Immutable.fromJS(threadsObject);
         updateCounter();
-	},
+    },
 
     /**
      * Создает тред в виде Immutable.Map
@@ -242,7 +242,7 @@ var Updater = {
      * @returns {Object}
      * @param {Immutable.Map} threadMap
      * */
-	getUpdates: function(threadMap) {
+    getUpdates: function(threadMap) {
 
         assert(!_.isUndefined(threadMap), "welcome to undefined world");
 
@@ -270,7 +270,7 @@ var Updater = {
 
             return {unread: newPostsCount, last_post: newData.max_num, not_found: false, error: false};
         }
-	},
+    },
 
     /**
      * запускает рекурсивный цикл обновлений
@@ -353,17 +353,17 @@ var Updater = {
  * Обработчик сообщений
  * */
 function initListener() {
-	chrome.runtime.onMessage.addListener(
-	    function(request, sender, sendResponse) {
+    chrome.runtime.onMessage.addListener(
+        function(request, sender, sendResponse) {
 
-	  	    if (!request.type) return;
+              if (!request.type) return;
 
-	  	    Monitor.log(request);
+              Monitor.log(request);
 
-	  	    switch(request.type) {
+              switch(request.type) {
                 case "thread-added":
 
-				    var threadData = request.data;
+                    var threadData = request.data;
 
                     var thread = Threads.pushThread(
                         Threads.createThread(
@@ -546,8 +546,8 @@ function initListener() {
                 break
             }
 
-	    }
-	)
+        }
+    )
 }
 
 function updateCounter() {
