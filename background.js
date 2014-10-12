@@ -540,10 +540,34 @@ function initListener() {
                                     )),
                             Threads.getThread(num).get("delay")
                         );
+                        updateCounter();
                         sendResponse({threads: Threads.getAllAsObjects()})
                     }
 
-                break
+                break;
+
+              case "popup-update-all":
+
+                  Monitor.log("popup-update-all");
+
+                  var threads = Threads.getAllAsObjects();
+
+                  for(num in threads) {
+                        if(threads.hasOwnProperty(num) && Threads.has(num)) {
+                            Scheduler.unscheduleTask(num);
+                            Updater.runMonitoring(
+                                Threads.pushThread(
+                                    Updater.getUpdatedThread(
+                                        Threads.getThread(num)
+                                    )),
+                                Threads.getThread(num).get("delay")
+                            );
+                        }
+                  }
+                  updateCounter();
+                  sendResponse({threads: Threads.getAllAsObjects()});
+
+              break;
             }
 
         }

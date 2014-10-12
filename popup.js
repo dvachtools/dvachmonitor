@@ -24,14 +24,20 @@ $(function(){
             renderLinks(sorted);
 
             $('.read-btn').on('click', function () {
-                $(this).attr('src', 'ok_pending.png');
+                $(this).attr('src', 'images/ok_pending.png');
                 markAsRead($(this).attr('thread-id'));
                 return false;
             });
 
             $('.update-btn').on('click', function () {
-                $(this).attr('src', 'reload_pending.png');
+                $(this).attr('src', 'images/reload_pending.png');
                 updateThread($(this).attr('thread-id'));
+                return false;
+            });
+
+            $('.update-all-btn').on('click', function () {
+                $(this).attr('src', 'images/reload_pending.png');
+                updateAll();
                 return false;
             });
         }
@@ -50,14 +56,14 @@ $(function(){
         });
     }
 
-    function markAsReadAll() {
-        chrome.runtime.sendMessage({ type: "popup-markasread-all" }, function(response){
+    function updateAll() {
+        chrome.runtime.sendMessage({ type: "popup-update-all" }, function(response){
             render(response.threads);
         });
     }
 
     function openAllUnread() {
-        chrome.runtime.sendMessage({ type: "popup-open-unread" }, function(){});        
+//        chrome.runtime.sendMessage({ type: "popup-open-unread" }, function(){});
     }
 
     function updateThread(num) {
@@ -73,6 +79,9 @@ $(function(){
     function renderLinks(threads) {
         var sorted = _.sortBy(threads, function(thread) { return -thread.unreads; });
         var links = $('#links-div');
+
+        links.append("<div style='position: absolute; left: 490px; top: 0'><img src='images/reload.png' class='update-all-btn' " +
+            "style='cursor:pointer;width: 24px; height: 24px' title='Обновить все' alt='Обновить все'></div>");
 
         for(key in sorted) {
             var thread = sorted[key];
@@ -90,9 +99,9 @@ $(function(){
 
         var errors_status = vsprintf("%s%s", [not_found_errors > 0 ? " 404 ":"", errors > 0 ? " <span style='color:red'>err</span> ":""]);
 
-        var markAsReadButton = unreads > 0 ? vsprintf(" <img src='images/ok.png' style='cursor:pointer;width: 12px; height: 12px' class=read-btn thread-id=%d>", [num]):"";
+        var markAsReadButton = unreads > 0 ? vsprintf(" <img title='Отметить как прочитанное' src='images/ok.png' style='cursor:pointer;width: 12px; height: 12px' class=read-btn thread-id=%d>", [num]):"";
 
-        var updateButton = vsprintf(" <img style='cursor: pointer;width: 12px; height: 12px' src='images/reload.png' class=update-btn thread-id=%d> ", [num]);
+        var updateButton = vsprintf(" <img title='Обновить' style='cursor: pointer;width: 12px; height: 12px' src='images/reload.png' class=update-btn thread-id=%d> ", [num]);
         
         return vsprintf("<div>(<span %s>%d</span>)%s%s%s<a class=thread-link href='%s' %s> /%s/%d - %s </a></div>",
             [style, unreads, markAsReadButton, updateButton, errors_status, urlhtml(board, num), style, board, num, title]);
