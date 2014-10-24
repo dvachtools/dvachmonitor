@@ -26,19 +26,16 @@ $(function(){
             $('.read-btn').on('click', function () {
                 $(this).attr('src', 'images/ok_pending.png');
                 markAsRead($(this).attr('thread-id'));
-                return false;
             });
 
             $('.update-btn').on('click', function () {
                 $(this).attr('src', 'images/reload_pending.png');
                 updateThread($(this).attr('thread-id'));
-                return false;
             });
 
             $('.update-all-btn').on('click', function () {
                 $(this).attr('src', 'images/reload_pending.png');
                 updateAll();
-                return false;
             });
         }
 

@@ -22,7 +22,7 @@ function currentTime() {
 }
 
 function url(domain, board, num) {
-	return "http://" + domain + "/" + board + "/res/" + num + ".json";
+	return "https://" + domain + "/" + board + "/res/" + num + ".json";
 }
 
 function secsToMins(secs) {
