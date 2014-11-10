@@ -3,15 +3,14 @@
 
   "name": "2chmon",
   "description": "2ch.hk bookmarks monitor.",
-  "version": "1.0.7",
+  "version": "1.0.8",
 
   "permissions": [
     "http://2ch.hk/",
     "https://2ch.hk/",
     "storage",
     "background",
-    "alarms",
-    "tabs"
+    "alarms"
   ],
   "browser_action": {
     "default_icon": "images/icon.png",
