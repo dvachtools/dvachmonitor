@@ -70,7 +70,7 @@ $(function(){
     }
 
     function urlhtml(board, num) {
-        return "http://2ch.hk/" + board + "/res/" + num + ".html";
+        return "http://2ch.hk/" + board + "/res/" + num + ".html#bottom";
     }
 
     function renderLinks(threads) {
