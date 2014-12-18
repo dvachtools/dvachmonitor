@@ -69,8 +69,8 @@ $(function(){
         });
     }
 
-    function urlhtml(board, num) {
-        return "http://2ch.hk/" + board + "/res/" + num + ".html#bottom";
+    function urlhtml(board, num, first_unread) {
+        return "http://2ch.hk/" + board + "/res/" + num + ".html#" + ((_.isUndefined(first_unread))? "bottom" : first_unread);
     }
 
     function renderLinks(threads) {
@@ -85,14 +85,13 @@ $(function(){
             
             // console.log(key, thread);
             // var div_template = '<div> I am <span id="age"></span> years old!</div>';
-            links.append(renderLinkRow(thread.board, thread.num, thread.unread, thread.title, thread.not_found_errors, thread.errors));
+            links.append(renderLinkRow(thread.board, thread.num, thread.unread, thread.title, thread.not_found_errors, thread.errors, thread.first_unread));
 
         }
     }
 
-    function renderLinkRow(board, num, unreads, title, not_found_errors, errors) {
+    function renderLinkRow(board, num, unreads, title, not_found_errors, errors, first_unread) {
         var style = unreads > 0 ? "style='font-weight: bold'":"";
-
 
         var errors_status = vsprintf("%s%s", [not_found_errors > 0 ? " 404 ":"", errors > 0 ? " <span style='color:red'>err</span> ":""]);
 
@@ -101,7 +100,7 @@ $(function(){
         var updateButton = vsprintf(" <img title='Обновить' style='cursor: pointer;width: 12px; height: 12px' src='images/reload.png' class=update-btn thread-id=%d> ", [num]);
         
         return vsprintf("<div>(<span %s>%d</span>)%s%s%s<a class=thread-link href='%s' %s> /%s/%d - %s </a></div>",
-            [style, unreads, markAsReadButton, updateButton, errors_status, urlhtml(board, num), style, board, num, title]);
+            [style, unreads, markAsReadButton, updateButton, errors_status, urlhtml(board, num, first_unread), style, board, num, title]);
     }
 
 });

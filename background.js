@@ -182,6 +182,7 @@ var Threads = {
             title: title,
             last_post: last_post,           // последний пост в треде
             last_update: currentTime(),
+            first_unread: last_post,        // первый непрочитанный пост
             unread: 0,                      // количество непрочитанных постов
             delay: Settings.minimumDelay,   // предыдущая задержка
             not_found_errors: 0,            // количество ошибок 404
@@ -208,7 +209,7 @@ var Threads = {
             if(_.isUndefined(last_post))
                 return threadMap.set("unread", 0);
             else
-                return threadMap.set("unread", 0).set("last_post", last_post);
+                return threadMap.set("unread", 0).set("last_post", last_post).set("first_unread", last_post);
         else
             return threadMap
     }
@@ -259,16 +260,26 @@ var Updater = {
             var newData = JSON.parse(resp);
 
             var newPostsCount = 0;
+            var first_unread = 0;
 
             if (newData.max_num != thread.last_post) {
-                newPostsCount = _.filter(
+                var newPosts = _.filter(
                     newData.threads[0].posts,
                     function (post) {
                         return (post.num > thread.last_post);
-                    }).length;
+                    });
+
+                newPostsCount = newPosts.length;
+                first_unread = newPosts[0].num; // первый непрочитанный из новых (!) непрочитанных
             }
 
-            return {unread: newPostsCount, last_post: newData.max_num, not_found: false, error: false};
+            return {
+                unread: newPostsCount,          // количество новых постов с последней проверки
+                last_post: newData.max_num,     // последний пост
+                first_unread: first_unread,     // номер первого непрочитанного поста среди новых
+                not_found: false,               // тред удален
+                error: false                    // ошибка HTTP
+            };
         }
     },
 
@@ -330,6 +341,7 @@ var Updater = {
             return threadMap.set("errors", threadMap.get("errors") + 1);
         } else if(result.unread > 0) {
             return threadMap.
+                    set("first_unread", (threadMap.get("unread") == 0 ? result.first_unread : threadMap.get("first_unread"))).
                     set("unread", threadMap.get("unread") + result.unread).
                     set("last_update", currentTime()).
                     set("errors", 0).
