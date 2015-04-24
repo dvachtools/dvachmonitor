@@ -9,11 +9,13 @@ if(window.thread.id) {
     window.postMessage({ type: "thread-loaded", data: data }, "*");
 }
 
+// отправляем избранное ублюдня
 window.postMessage({ type: "storage-favorites", data: JSON.parse(localStorage["store"]).favorites}, "*");
 
 
 var old = window.Gevent.emit;
 
+// хукаем стандартную функцию добавления треда в избранную
 window.Gevent.emit = function(name, data) {
     
     console.log(name);
@@ -42,6 +44,8 @@ window.Gevent.emit = function(name, data) {
     return old.apply(window.Gevent, [name, data]);
 };
 
+
+// всякие ссаки
 window.addEventListener('focus', function() {
     if(!window.thread.id) return;
     console.log("focus");

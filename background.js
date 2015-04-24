@@ -273,6 +273,8 @@ var Updater = {
                 first_unread = newPosts[0].num; // первый непрочитанный из новых (!) непрочитанных
             }
 
+            Monitor.log("thread: " + thread.num + ", unread:" + newPostsCount + ", new last_post: " + newData.max_num + ",  thread.last_post: " +  thread.last_post);
+
             return {
                 unread: newPostsCount,          // количество новых постов с последней проверки
                 last_post: newData.max_num,     // последний пост
@@ -596,5 +598,5 @@ function updateCounter() {
         }
     }
 
-    chrome.browserAction.setBadgeText({text: totalUnreads.toString()});
+    chrome.browserAction.setBadgeText({text: totalUnreads > 0 ? totalUnreads.toString(): ''});
 }

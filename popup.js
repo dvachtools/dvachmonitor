@@ -10,7 +10,8 @@ $(function(){
     var div_default_content =  $('#links-div').html();
 
     function render(threads) {
-        var sorted = _.sortBy(threads, function(thread) { return -thread.unread; });
+        var sorted = _.sortBy(threads, function(thread) { return thread.board; });
+        var sorted = _.sortBy(sorted, function(thread) { return -thread.unread; });
 
         var content_div = $('#links-div');
 
@@ -95,12 +96,19 @@ $(function(){
 
         var errors_status = vsprintf("%s%s", [not_found_errors > 0 ? " 404 ":"", errors > 0 ? " <span style='color:red'>err</span> ":""]);
 
-        var markAsReadButton = unreads > 0 ? vsprintf(" <img title='Отметить как прочитанное' src='images/ok.png' style='cursor:pointer;width: 12px; height: 12px' class=read-btn thread-id=%d>", [num]):"";
+        var markAsReadButton = vsprintf(" <img title='Отметить как прочитанное' src='images/ok.png' style='cursor:pointer;width: 12px; height: 12px' class=read-btn thread-id=%d>", [num]);
 
-        var updateButton = vsprintf(" <img title='Обновить' style='cursor: pointer;width: 12px; height: 12px' src='images/reload.png' class=update-btn thread-id=%d> ", [num]);
+        var preinfo = unreads > 0 ? vsprintf("%s(<span %s>%d</span>) ", [markAsReadButton, style, unreads]) : "";
+
+        //var updateButton = vsprintf(" <img title='Обновить' style='cursor: pointer;width: 12px; height: 12px' src='images/reload.png' class=update-btn thread-id=%d> ", [num]);
         
-        return vsprintf("<div>(<span %s>%d</span>)%s%s%s<a class=thread-link href='%s' %s> /%s/%d - %s </a></div>",
-            [style, unreads, markAsReadButton, updateButton, errors_status, urlhtml(board, num, first_unread), style, board, num, title]);
+    /*    return vsprintf("<div>(<span %s>%d</span>)%s%s%s<a class=thread-link href='%s' %s> /%s/%d - %s </a></div>",
+            [style, unreads, markAsReadButton, updateButton, errors_status, urlhtml(board, num, first_unread), style, board, num, title]);*/
+
+        return vsprintf("<div class='link-div'>%s%s<a class=thread-link href='%s' %s> /%s/%d - %s </a></div>",
+            [preinfo, errors_status, urlhtml(board, num, first_unread), style, board, num, title]);
+
+
     }
 
 });
