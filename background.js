@@ -49,7 +49,7 @@ var Storage = {
 
 (function(){
     Monitor.log("started");
-    chrome.browserAction.setBadgeText({text: '0'});
+    chrome.browserAction.setBadgeText({text: ''});
 
     Storage.load(function(threads){
         Monitor.log("Data loaded from local storage " + threads);
@@ -184,7 +184,7 @@ var Threads = {
             last_update: currentTime(),
             first_unread: last_post,        // первый непрочитанный пост
             unread: 0,                      // количество непрочитанных постов
-            delay: Settings.minimumDelay,   // предыдущая задержка
+            delay: Settings.minimumDelay,   // предыдущая задержка перед обновлением
             not_found_errors: 0,            // количество ошибок 404
             errors: 0                       // количество ошибок соединения
         });
@@ -249,7 +249,7 @@ var Updater = {
 
         var thread = threadMap.toObject();
 
-        var resp = httpGet(url(Settings.domain, thread.board, thread.num));
+        var resp = httpGet(url(Settings.domain, thread.board, thread.num)); // получаем json треда
 
         if(resp == "CONNECTION_ERROR" || _.isUndefined(resp)) {
             return {unread: -1, last_post: -1, not_found: false, error: true};
@@ -287,7 +287,7 @@ var Updater = {
 
     /**
      * запускает рекурсивный цикл обновлений
-     * Цикл отменяется при помочи Scheduler.unscheduleTask(num)
+     * Цикл отменяется при помочи Scheduler.unscheduleTask(thread_num)
      * @param {Immutable.Map} threadMap
      * @param {number=} delay задержка перед проверкой, по умолчанию Settings.minimumDelay
      * */
@@ -301,12 +301,13 @@ var Updater = {
             function() {
 
                 var checkResult = self.getUpdates(threadMap);
-                var applied = self.applyResultToThread(threadMap, checkResult);
+                var applied = self.applyResultToThread(threadMap, checkResult); // новый объект треда
 
                 if(checkResult.unread > 0) {
                     self.runMonitoring(
                         Threads.pushThread (
-                            applied.set("delay", Settings.minimumDelay)
+                            applied.set("delay", Settings.minimumDelay) // если есть новые сообщения, то следующая
+                            // проверка будет через минимальное кол-во времени
                         ), Settings.minimumDelay);
 
                     updateCounter();
@@ -363,8 +364,52 @@ var Updater = {
 };
 
 
+var MainActor = {
+    receive: actorReceive({}, {}),
+
+    become: function(newReceive) {
+        this.receive = newReceive
+    }
+};
+
+function actorReceive(threads, state) {
+    return function(messageId, messageData, responseCallback) {
+        switch(messageId) {
+            case "thread-added":
+                break;
+
+            case "thread-removed":
+                break;
+
+            case "window-focused":
+                break;
+
+            case "window-blured":
+                break;
+
+            case "thread-loaded":
+                break;
+
+            case "window-unload":
+                break;
+
+            case "storage-favorites":
+                break;
+
+            case "popup-request":
+                break;
+
+            case "popup-markasread":
+                break;
+
+            case "popup-update-all":
+                break;
+        }
+    }
+}
+
 /**
- * Обработчик сообщений
+ * Обработчик сообщений от попапа и контент-скрипта
  * */
 function initListener() {
     chrome.runtime.onMessage.addListener(

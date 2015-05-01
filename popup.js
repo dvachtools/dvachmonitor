@@ -1,17 +1,17 @@
 $(function(){
-    chrome.runtime.sendMessage({ type: "popup-request" }, function(response) {
+    chrome.runtime.sendMessage({ type: "popup-request" }, function(threads) {
 
         console.log("Got popup-response");
-        console.log(response);
+        console.log(threads);
 
-        render(response.threads);
+        render(threads.threads);
     });
 
     var div_default_content =  $('#links-div').html();
 
     function render(threads) {
         var sorted = _.sortBy(threads, function(thread) { return thread.board; });
-        var sorted = _.sortBy(sorted, function(thread) { return -thread.unread; });
+        sorted = _.sortBy(sorted, function(thread) { return -thread.unread; });
 
         var content_div = $('#links-div');
 
@@ -107,7 +107,6 @@ $(function(){
 
         return vsprintf("<div class='link-div'>%s%s<a class=thread-link href='%s' %s> /%s/%d - %s </a></div>",
             [preinfo, errors_status, urlhtml(board, num, first_unread), style, board, num, title]);
-
 
     }
 
