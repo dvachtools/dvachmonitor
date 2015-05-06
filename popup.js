@@ -1,15 +1,18 @@
 $(function(){
-    chrome.runtime.sendMessage({ type: "popup-request" }, function(threads) {
+    chrome.runtime.sendMessage({ type: "popup-request" }, function(data) {
 
         console.log("Got popup-response");
-        console.log(threads);
+        console.log(data.state);
+        console.log(data.threads);
 
-        render(threads.threads);
+        render(data.threads, data.state);
     });
 
     var div_default_content =  $('#links-div').html();
 
-    function render(threads) {
+    var hoveredOver = null;
+
+    function render(threads, addableThread) {
         var sorted = _.sortBy(threads, function(thread) { return thread.board; });
         sorted = _.sortBy(sorted, function(thread) { return -thread.unread; });
 
@@ -38,25 +41,58 @@ $(function(){
                 $(this).attr('src', 'images/reload_pending.png');
                 updateAll();
             });
+
+            $('.remove-thread-btn').on('click', function () {
+                //$(this).attr('src', 'images/reload_pending.png');
+
+                chrome.runtime.sendMessage({ type: "remove-thread", data: {threadId: $(this).attr('thread-id')} }, function(response){
+                    render(response.threads, response.state);
+                });
+            });
+        }
+
+        if(addableThread.addable) {
+            content_div.append("<div style='position: absolute; left: 460px; top: 0'><img src='images/plus.png' class='add-thread-btn' " +
+                "style='cursor:pointer;width: 24px; height: 24px' title='Добавить тред " + addableThread.threadData.title + "' alt='Добавить тред'></div>");
+
+            $('.add-thread-btn').on('click', function () {
+                //$(this).attr('src', 'images/reload_pending.png');
+
+                chrome.runtime.sendMessage({ type: "add-current-thread" }, function(response){
+                    render(response.threads, response.state);
+                });
+            });
         }
 
         $('.thread-link').on('click', function () {
             chrome.tabs.create({url: $(this).attr('href')});
             return false;
+        }).on('mouseover', function(e) {
+            hoveredOver =  $(e.currentTarget);
+        }).on('mouseout', function(e) {
+            hoveredOver = null;
         });
-
     }
+
+    $(document).keypress(function(e) {
+        if (e.which == 127 && hoveredOver) {
+            console.log(hoveredOver.attr('thread-id'));
+            chrome.runtime.sendMessage({ type: "remove-thread", data: {threadId: hoveredOver.attr('thread-id')} }, function(response){
+                render(response.threads, response.state);
+            });
+        }
+    });
 
     function markAsRead(num) {
         console.log("markAsRead " + num);
-        chrome.runtime.sendMessage({ type: "popup-markasread", data: {num: num} }, function(response){
-            render(response.threads);
+        chrome.runtime.sendMessage({ type: "popup-markasread", data: {threadId: num} }, function(response){
+            render(response.threads, response.state);
         });
     }
 
     function updateAll() {
         chrome.runtime.sendMessage({ type: "popup-update-all" }, function(response){
-            render(response.threads);
+            render(response.threads, response.state);
         });
     }
 
@@ -100,13 +136,16 @@ $(function(){
 
         var preinfo = unreads > 0 ? vsprintf("%s(<span %s>%d</span>) ", [markAsReadButton, style, unreads]) : "";
 
+        /*preinfo = vsprintf("<img title='удалить' src='images/delete.png' " +
+            "style='cursor:pointer;width: 12px; height: 12px' class=remove-thread-btn thread-id=%d>", [num]) + preinfo;*/
+
         //var updateButton = vsprintf(" <img title='Обновить' style='cursor: pointer;width: 12px; height: 12px' src='images/reload.png' class=update-btn thread-id=%d> ", [num]);
         
     /*    return vsprintf("<div>(<span %s>%d</span>)%s%s%s<a class=thread-link href='%s' %s> /%s/%d - %s </a></div>",
             [style, unreads, markAsReadButton, updateButton, errors_status, urlhtml(board, num, first_unread), style, board, num, title]);*/
 
-        return vsprintf("<div class='link-div'>%s%s<a class=thread-link href='%s' %s> /%s/%d - %s </a></div>",
-            [preinfo, errors_status, urlhtml(board, num, first_unread), style, board, num, title]);
+        return vsprintf("<div class='link-div'>%s%s<a title='Нажми Delete, чтобы удалить' class=thread-link thread-id=%d href='%s' %s> /%s/%d - %s </a></div>",
+            [preinfo, errors_status, num, urlhtml(board, num, first_unread), style, board, num, title]);
 
     }
 

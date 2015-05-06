@@ -39,3 +39,12 @@ function assert(cond, message) {
     if(!cond)
         throw new Error(message);
 }
+
+function stackTrace() {
+    try {
+        var err = new Error();
+        throw err;
+    } catch (err) {
+        return err.stack;
+    }
+}

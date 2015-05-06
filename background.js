@@ -7,14 +7,16 @@ var Settings = {
 };
 
 var MonitorData = {
-    threadsMap: Immutable.Map({}),
+    //threadsMap: Immutable.Map({}),
     debug: true
 };
 
 var Monitor = {
     log: function (msg) {
-        if(MonitorData.debug)
+        if(MonitorData.debug) {
+            //console.log(stackTrace());
             console.log(msg)
+        }
     }
 };
 
@@ -37,33 +39,17 @@ var Storage = {
 
             Monitor.log(savedData);
 
-            if(!_.isUndefined(savedData.dvachmon))
-                Threads.loadFromObjects(savedData.dvachmon.threads);
-            else
-                Threads.loadFromObjects({});
+            var threads;
 
-            func(Threads.getAll());
+            if(!_.isUndefined(savedData.dvachmon))
+                threads = ThreadsProto.loadFromObjects(savedData.dvachmon.threads);
+            else
+                threads = ThreadsProto.loadFromObjects({});
+
+            func(threads);
         });
     }
 };
-
-(function(){
-    Monitor.log("started");
-    chrome.browserAction.setBadgeText({text: ''});
-
-    Storage.load(function(threads){
-        Monitor.log("Data loaded from local storage " + threads);
-
-        var stupidFuckingJavascript = threads.toObject();
-
-        for(var k in stupidFuckingJavascript){
-            if(stupidFuckingJavascript.hasOwnProperty(k))
-                Updater.runMonitoring(Threads.getThread(k), 0);
-        }
-
-        initListener();
-    });
-})();
 
 var Scheduler = {
 
@@ -118,28 +104,38 @@ var Scheduler = {
     }
 };
 
-var Threads = {
-    /** @returns {Immutable.Map}*/
-    getThread: function (num) {
-        return MonitorData.threadsMap.get(num.toString());
+var ThreadsProto = {
+    threadsMap: Immutable.Map({}),
+
+    /** @returns {ThreadsProto}*/
+    fromThreadsMap: function(tmap) {
+        var copy = _.clone(this);
+        copy.threadsMap = tmap;
+        return copy;
     },
 
+    /** @returns {Immutable.Map}*/
+    getThread: function (num) {
+        return this.threadsMap.get(num.toString());
+    },
+
+    /** @returns {ThreadsProto}*/
     deleteThread: function (num) {
-        MonitorData.threadsMap = MonitorData.threadsMap.delete(num.toString());
-        Storage.saveThreads();
+        return this.fromThreadsMap(this.threadsMap.delete(num.toString()));
+        //Storage.saveThreads();
     },
 
     /**
      * Возвращает треды в виде Immutable.Map
      * @returns {Immutable.Map}*/
     getAll: function() {
-        return MonitorData.threadsMap;
+        return this.threadsMap;
     },
 
     /** Возвращает треды в виде js-объекта
-     * @returns {Object}*/
+     * @returns {ThreadsProto}*/
     getAllAsObjects: function() {
-        return MonitorData.threadsMap.map(function(threadMap) { return threadMap.toObject(); }).toObject();
+        return this.threadsMap.map(function(threadMap) { return threadMap.toObject(); }).toObject();
     },
 
     /**
@@ -153,22 +149,19 @@ var Threads = {
             throw new Error("Pushing undefined");
         }
 
-        MonitorData.threadsMap = MonitorData.threadsMap.set(thread.get("num").toString(), thread);
-
-        Storage.saveThreads();
-
-        return thread;
+        return this.fromThreadsMap(this.threadsMap.set(thread.get("num").toString(), thread));
     },
 
     /** @returns {Boolean}*/
     has: function(num) {
         // return (num in MonitorData.threads);
-        return MonitorData.threadsMap.has(num.toString());
+        return this.threadsMap.has(num.toString());
     },
 
+    /** @returns {ThreadsProto}*/
     loadFromObjects: function(threadsObject) {
-        MonitorData.threadsMap = Immutable.fromJS(threadsObject);
-        updateCounter();
+        //updateCounter();
+        return this.fromThreadsMap(Immutable.fromJS(threadsObject));
     },
 
     /**
@@ -301,7 +294,8 @@ var Updater = {
             function() {
 
                 var checkResult = self.getUpdates(threadMap);
-                var applied = self.applyResultToThread(threadMap, checkResult); // новый объект треда
+                MainActor.receive("thread-checked", {thread: threadMap, result: checkResult, delay: delay});
+                /*var applied = self.applyResultToThread(threadMap, checkResult); // новый объект треда
 
                 if(checkResult.unread > 0) {
                     self.runMonitoring(
@@ -322,7 +316,7 @@ var Updater = {
                         Threads.pushThread(applied.set("delay", newDelay)),
                         newDelay
                     );
-                }
+                }*/
 
             },
             _.isUndefined(delay) ? Settings.minimumDelay : delay
@@ -365,44 +359,347 @@ var Updater = {
 
 
 var MainActor = {
-    receive: actorReceive({}, {}),
+    receive: actorReceive(ThreadsProto, {tabs: []}),
 
     become: function(newReceive) {
         this.receive = newReceive
+    },
+
+    stateAddTab: function(state, windowId, tabId, threadData) {
+        state = this.stateRemoveTab(state, windowId, tabId);
+        state.tabs = state.tabs.concat([{windowId: windowId, tabId: tabId, threadData: threadData}]);
+        return state
+    },
+
+    stateRemoveTab: function(state, windowId, tabId) {
+        state.tabs = _.without(state.tabs, _.findWhere(state.tabs, {windowId: windowId, tabId: tabId}));
+        return state;
     }
 };
 
+(function(){
+    Monitor.log("started");
+    chrome.browserAction.setBadgeText({text: ''});
+
+    Storage.load(function(threads){
+        Monitor.log("Data loaded from local storage " + threads);
+
+        MainActor.receive("restore-storage", threads, function() {
+
+            chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
+                if (changeInfo.status == 'complete') {
+                    MainActor.receive("update-tab", {tabId: tabId});
+                }
+            });
+
+            initListener();
+        });
+
+    });
+})();
+
 function actorReceive(threads, state) {
+    assert(!_.isUndefined(threads), "Oh hai");
+
     return function(messageId, messageData, responseCallback) {
+
+        assert(!_.isUndefined(threads), "Oh hai x 2");
+
+        Monitor.log(state);
+
+        //responseCallback = (_.isNaN(responseCallback))? function(){}: responseCallback;
+
         switch(messageId) {
-            case "thread-added":
+            case "restore-storage":
+
+                threads = messageData;
+
+                var stupidFuckingJavascript = threads.getAll().toObject();
+
+                for(var k in stupidFuckingJavascript){
+                    if(stupidFuckingJavascript.hasOwnProperty(k))
+                        Updater.runMonitoring(threads.getThread(k), 0);
+                }
+
+                MainActor.become(actorReceive(threads, state));
+
+                MainActor.receive("update-content-script");
+
+                responseCallback();
+
                 break;
 
-            case "thread-removed":
+            case "thread-checked":
+
+                var threadMap = messageData.thread;
+                var checkResult = messageData.result;
+                var delay = messageData.delay;
+
+                var applied = Updater.applyResultToThread(threadMap, checkResult); // новый объект треда
+
+                 if(checkResult.unread > 0) {
+
+                     thread = applied.set("delay", Settings.minimumDelay); // если есть новые сообщения, то следующая
+                     // проверка будет через минимальное кол-во времени
+                     threads = threads.pushThread(thread);
+
+                     Updater.runMonitoring(thread, Settings.minimumDelay);
+
+                     updateCounter(threads);
+
+                 } else {    // иначе запускаем с увеличенной задержкой
+
+                     var newDelay = Updater.getUpdateDelay(_.isUndefined(delay) ? Settings.minimumDelay : delay);
+
+                     assert(!_.isNaN(newDelay), "ebal ruka");
+
+                     thread = applied.set("delay", newDelay);
+                     threads = threads.pushThread(thread);
+
+                     Updater.runMonitoring(thread, newDelay);
+                 }
+
+                MainActor.become(actorReceive(threads, state));
+
                 break;
 
             case "window-focused":
+
+                Monitor.log("focused");
+
+                if(threads.has(messageData.threadId)) {
+                    Scheduler.unscheduleTask(messageData.threadId);
+
+                    threads = threads.pushThread(
+                        threads.markThreadAsRead(
+                            threads.getThread(messageData.threadId),
+                            messageData.last_post)
+                    );
+
+                    updateCounter(threads);
+                }
+
+                MainActor.become(actorReceive(threads, state));
+
                 break;
 
             case "window-blured":
+
+                Monitor.log("unfocused");
+                if(threads.has(messageData.threadId)) {
+                    Scheduler.unscheduleTask(messageData.threadId);
+
+                    threads = threads.pushThread(
+                        threads.markThreadAsRead(
+                            threads.getThread(messageData.threadId),
+                            messageData.last_post
+                        )
+                    );
+
+                    updateCounter(threads);
+                    Updater.runMonitoring(threads.getThread(messageData.threadId));
+                }
+
+                MainActor.become(actorReceive(threads, /*{thread_opened: false}*/state));
+
                 break;
 
             case "thread-loaded":
+
+                Monitor.log("loaded");
+
+                var sender = messageData[0];
+                var threadData = messageData[1];
+
+                if(threads.has(threadData.threadId)) {
+                    Scheduler.unscheduleTask(threadData.threadId);
+
+                    threads = threads.pushThread(
+                        threads.markThreadAsRead(
+                            threads.getThread(threadData.threadId),
+                            threadData.last_post)
+                    );
+                    updateCounter(threads);
+                }
+
+                state = MainActor.stateAddTab(state, sender.tab.windowId, sender.tab.id, threadData);
+
+                MainActor.become(actorReceive(threads, state));
+
                 break;
 
             case "window-unload":
+
+                sender = messageData[0];
+                threadData = messageData[1];
+
+                Monitor.log("unloaded");
+                if(threads.has(threadData.threadId)) {
+                    Scheduler.unscheduleTask(threadData.threadId);
+                    threads = threads.pushThread(
+                        threads.markThreadAsRead(
+                            threads.getThread(threadData.threadId),
+                            threadData.last_post)
+                    );
+
+                    updateCounter(threads);
+                    MainActor.become(actorReceive(threads, state));
+                    Updater.runMonitoring(threads.getThread(threadData.threadId));
+                }
+
+                state = MainActor.stateRemoveTab(state, sender.tab.windowId, sender.tab.id);
+
+                MainActor.become(actorReceive(threads, state));
+
                 break;
 
             case "storage-favorites":
                 break;
 
+            case "add-thread":
+
+                threads = threads.pushThread(
+                    threads.createThread(
+                        messageData.threadId,
+                        messageData.board,
+                        messageData.title,
+                        messageData.last_post
+                ));
+
+                updateCounter(threads);
+
+                if(!_.isUndefined(messageData.from_main) && messageData.from_main)
+                    Updater.runMonitoring(threads.getThread(messageData.threadId));
+
+                MainActor.become(actorReceive(threads, state));
+                MainActor.receive("popup-request", {}, responseCallback);
+                break;
+
+            case "add-current-thread":
+
+/*                if(state.thread_opened && !threads.has(state.current_thread.threadId)) {
+                    MainActor.receive("add-thread", state.current_thread, responseCallback);
+                } else {
+                    Monitor.log("No current thread :(");
+                    responseCallback(threads, state);
+                }*/
+
+                MainActor.receive("popup-request", {}, function(thds, current){
+                    if(current.addable) {
+                        MainActor.receive("add-thread", current.threadData, responseCallback);
+                    } else {
+                        responseCallback(thds, current);
+                    }
+                });
+
+                break;
+
+            case "remove-thread":
+
+                Monitor.log("remove-thread");
+
+                if(threads.has(messageData.threadId)) {
+                    Monitor.log("removing " + messageData.threadId);
+
+                    Scheduler.unscheduleTask(messageData.threadId);
+                    threads = threads.deleteThread(messageData.threadId);
+                    updateCounter(threads);
+                    MainActor.become(actorReceive(threads, state));
+                }
+                //responseCallback(threads, state);
+                MainActor.receive("popup-request", {}, responseCallback);
+
+                break;
+
             case "popup-request":
+                chrome.tabs.query({'active': true, 'lastFocusedWindow': true}, function(tabs) {
+                    console.log(tabs); //test, prints one-element array as expected
+                    console.log(state.tabs);
+                    if(tabs.length > 0) {
+                        var x = {
+                            windowId: tabs[0].windowId,
+                            tabId: tabs[0].id
+                        };
+
+                        var currentThread = _.findWhere(state.tabs, x);
+
+                        if(_.isUndefined(currentThread))
+                            responseCallback(threads, {addable: false});
+                        else
+                            responseCallback(threads, {addable: !threads.has(currentThread.threadData.threadId), threadData: currentThread.threadData});
+                    } else {
+                        responseCallback(threads, {addable: false});
+                    }
+                });
                 break;
 
             case "popup-markasread":
+
+                Monitor.log("Got popup-markasread");
+                var threadId = messageData.threadId;
+
+                if(threads.has(threadId)) {
+                    Scheduler.unscheduleTask(threadId);
+
+
+                    threads = threads.pushThread(
+                        threads.markThreadAsRead(
+                            Updater.getUpdatedThread(
+                                threads.getThread(threadId)
+                            )));
+
+                    Updater.runMonitoring(threads.getThread(threadId), threads.getThread(threadId).get("delay"));
+
+                    updateCounter(threads);
+                    MainActor.receive("popup-request", {}, responseCallback);
+                }
+
                 break;
 
             case "popup-update-all":
+
+                Monitor.log("popup-update-all");
+
+                var threadsMap = threads.getAllAsObjects();
+
+                for(var num in threadsMap) {
+                    if(threadsMap.hasOwnProperty(num) && threads.has(num)) {
+                        Scheduler.unscheduleTask(num);
+
+                        threads = threads.pushThread(
+                            Updater.getUpdatedThread(
+                                threads.getThread(num)
+                            )
+                        );
+
+                        Updater.runMonitoring(
+                            threads.getThread(num),
+                            threads.getThread(num).get("delay")
+                        );
+                    }
+                }
+
+                updateCounter(threads);
+                MainActor.become(actorReceive(threads, state));
+                MainActor.receive("popup-request", {}, responseCallback);
+
+                break;
+
+            case "update-tab":
+
+                chrome.tabs.sendMessage(messageData.tabId, threads.getAll().toObject());
+
+                break;
+
+            case "update-content-script":
+
+                chrome.tabs.query({}, function(tabs) {
+                    for (var i=0; i<tabs.length; ++i) {
+                        console.log(tabs[i]);
+                        chrome.tabs.sendMessage(tabs[i].id, threads.getAll().toObject());
+                    }
+                });
+
                 break;
         }
     }
@@ -417,39 +714,9 @@ function initListener() {
 
               if (!request.type) return;
 
-              Monitor.log(request);
+              console.log(request, sender);
 
               switch(request.type) {
-                case "thread-added":
-
-                    var threadData = request.data;
-
-                    var thread = Threads.pushThread(
-                        Threads.createThread(
-                            threadData.num,
-                            threadData.board,
-                            threadData.title,
-                            threadData.last_post
-                        )
-                    );
-
-                    // если добавлено с главной, то начинаем мониторить
-                    // иначе юзер сидит в треде и мониторить его смысла нет
-                    if(threadData.from_main)
-                        Updater.runMonitoring(thread);
-                break;
-
-                case "thread-removed":
-
-                    Monitor.log("removed");
-                    if(Threads.has(request.data.num)) {
-                        Monitor.log("removing " + request.data.num);
-                        Scheduler.unscheduleTask(request.data.num);
-                        Threads.deleteThread(request.data.num);
-                        updateCounter();
-                    }
-
-                break;
 
                 /**
                  * Если битард вернулся во вкладку, то отмечаем ее как прочитанную и перестаем мониторить
@@ -457,16 +724,7 @@ function initListener() {
 
                 case "window-focused":
                     Monitor.log("focused");
-                    if(Threads.has(request.data.threadId)) {
-                        Scheduler.unscheduleTask(request.data.threadId);
-
-                        Threads.pushThread(
-                            Threads.markThreadAsRead(
-                                Threads.getThread(request.data.threadId),
-                                request.data.last_post)
-                        );
-                        updateCounter();
-                    }
+                    MainActor.receive("window-focused", request.data);
                 break;
 
                 /**
@@ -475,18 +733,7 @@ function initListener() {
 
                 case "window-blured":
                     Monitor.log("unfocused");
-                    if(Threads.has(request.data.threadId)) {
-                        Scheduler.unscheduleTask(request.data.threadId);
-                        Updater.runMonitoring(
-                            Threads.pushThread(
-                                Threads.markThreadAsRead(
-                                    Threads.getThread(request.data.threadId),
-                                    request.data.last_post
-                                )
-                            )
-                        );
-
-                    }
+                    MainActor.receive("window-blured", request.data);
                 break;
 
                 /**
@@ -495,16 +742,7 @@ function initListener() {
                 case "thread-loaded":
                     Monitor.log("loaded");
 
-                    if(Threads.has(request.data.threadId)) {
-                        Scheduler.unscheduleTask(request.data.threadId);
-
-                        Threads.pushThread(
-                            Threads.markThreadAsRead(
-                                Threads.getThread(request.data.threadId),
-                                request.data.last_post)
-                        );
-                        updateCounter();
-                    }
+                    MainActor.receive("thread-loaded", [sender, request.data]);
                 break;
 
                 /**
@@ -512,24 +750,14 @@ function initListener() {
                  * */
                 case "window-unload":
                     Monitor.log("unloaded");
-                    if(Threads.has(request.data.threadId)) {
-                        Scheduler.unscheduleTask(request.data.threadId);
-                        Updater.runMonitoring(
-                            Threads.pushThread(
-                                Threads.markThreadAsRead(
-                                    Threads.getThread(request.data.threadId),
-                                    request.data.last_post)
-                            )
-                        );
-
-                    }
+                    MainActor.receive("window-unload", [sender, request.data]);
                 break;
 
                 /**
                  * Подгружает избранное с двоща. Добавляет только то, чего еще нет в Threads
                  * */
                 case "storage-favorites":
-                    Monitor.log("storage-favorites");
+/*                    Monitor.log("storage-favorites");
                     Monitor.log(request.data);
 
                     var favs = request.data;
@@ -550,43 +778,33 @@ function initListener() {
                         );
                     });
 
-                    Monitor.log(newFavsNums);
+                    Monitor.log(newFavsNums);*/
                 break;
+
+              /**
+               *  реквесты из hook.js
+               *  */
+              case "thread-added":
+                  MainActor.receive("add-thread", request.data, function(thds, state){});
+                  break;
+
+              case "thread-removed":
+                  MainActor.receive("remove-thread", request.data, function(thds, state){});
+
+                  break;
 
                 /**
                  * реквесты из popup.html
                  * */
-                case "popup-request":
-                    Monitor.log("Got popup-request");
-                    sendResponse({threads: Threads.getAllAsObjects()});
-                break;
 
                 case "popup-markasread":
-
-                    Monitor.log("Got popup-markasread");
-                    var num = request.data.num;
-
-                    if(Threads.has(num)) {
-                        Scheduler.unscheduleTask(num);
-
-                        Updater.runMonitoring(
-                            Threads.pushThread(
-                                Threads.markThreadAsRead(
-                                    Updater.getUpdatedThread(
-                                        Threads.getThread(num)
-                                    ))),
-                            Threads.getThread(num).get("delay")
-                        );
-
-                        updateCounter();
-                        sendResponse({threads: Threads.getAllAsObjects()});
-                    }
-
-
+                    MainActor.receive("popup-markasread", request.data, function(thds, state) {
+                        sendResponse({threads: thds.getAllAsObjects(), state: state});
+                    });
                 break;
 
                 case "popup-update":
-
+/*
                     Monitor.log("popup-update");
                     var num = request.data.num;
 
@@ -602,39 +820,64 @@ function initListener() {
                         updateCounter();
                         sendResponse({threads: Threads.getAllAsObjects()})
                     }
-
+*/
                 break;
+
+              case "popup-request":
+                  Monitor.log("Got popup-request");
+
+                  console.log(sendResponse);
+
+                  MainActor.receive("popup-request", {}, function(thds, state) {
+                      console.log(sendResponse);
+                      sendResponse({threads: thds.getAllAsObjects(), state: state});
+                  });
+                  break;
+
+              case "add-current-thread":
+
+                  Monitor.log("Got add-current-thread");
+                  MainActor.receive("add-current-thread", {}, function(thds, state){
+                      sendResponse({threads: thds.getAllAsObjects(), state: state});
+                  });
+
+                  break;
+
+              case "remove-thread":
+
+                  Monitor.log("Got remove-thread");
+                  MainActor.receive("remove-thread", request.data, function(thds, state){
+                      sendResponse({threads: thds.getAllAsObjects(), state: state});
+                  });
+
+
+                  break;
 
               case "popup-update-all":
 
                   Monitor.log("popup-update-all");
 
-                  var threads = Threads.getAllAsObjects();
-
-                  for(num in threads) {
-                        if(threads.hasOwnProperty(num) && Threads.has(num)) {
-                            Scheduler.unscheduleTask(num);
-                            Updater.runMonitoring(
-                                Threads.pushThread(
-                                    Updater.getUpdatedThread(
-                                        Threads.getThread(num)
-                                    )),
-                                Threads.getThread(num).get("delay")
-                            );
-                        }
-                  }
-                  updateCounter();
-                  sendResponse({threads: Threads.getAllAsObjects()});
+                  MainActor.receive(
+                      "popup-update-all",
+                      {},
+                      function(ths, state) {
+                          sendResponse({threads: ths.getAllAsObjects(), state: state});
+                      }
+                  );
 
               break;
             }
 
+            return true;
         }
     )
 }
 
-function updateCounter() {
-    var threads = Threads.getAllAsObjects();
+function updateCounter(threads) {
+
+    MainActor.receive("update-content-script");
+
+    threads = threads.getAllAsObjects();
     var totalUnreads = 0;
 
     for(var key in threads) {

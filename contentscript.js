@@ -10,7 +10,9 @@ s.onload = function() {
 (document.head||document.documentElement).appendChild(s);
 
 
-var port = chrome.runtime.connect();
+//var port = chrome.runtime.connect();
+
+console.log("high from content script");
 
 window.addEventListener("message", function(event) {
 
@@ -28,3 +30,8 @@ window.addEventListener("message", function(event) {
 	chrome.runtime.sendMessage(event.data);
 
 }, false);
+
+chrome.runtime.onMessage.addListener(
+	function(request, sender, sendResponse) {
+        window.postMessage({extensionMessage: request}, '*');
+	});
