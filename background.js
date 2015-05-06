@@ -179,7 +179,8 @@ var ThreadsProto = {
             unread: 0,                      // количество непрочитанных постов
             delay: Settings.minimumDelay,   // предыдущая задержка перед обновлением
             not_found_errors: 0,            // количество ошибок 404
-            errors: 0                       // количество ошибок соединения
+            errors: 0,                       // количество ошибок соединения
+            is_monitored: true
         });
 
         Monitor.log("a new data received " + JSON.stringify(thread));
@@ -418,7 +419,14 @@ function actorReceive(threads, state) {
 
                 for(var k in stupidFuckingJavascript){
                     if(stupidFuckingJavascript.hasOwnProperty(k))
-                        Updater.runMonitoring(threads.getThread(k), 0);
+                        if(threads.getThread(k).get("is_monitored"))
+                            Updater.runMonitoring(threads.getThread(k), 0);
+                        else {
+                            if(_.isUndefined(threads.getThread(k).get("is_monitored"))) {
+                                threads = threads.pushThread(threads.getThread(k).set("is_monitored", true));
+                                Updater.runMonitoring(threads.getThread(k), 0);
+                            }
+                        }
                 }
 
                 MainActor.become(actorReceive(threads, state));
@@ -497,7 +505,9 @@ function actorReceive(threads, state) {
                     );
 
                     updateCounter(threads);
-                    Updater.runMonitoring(threads.getThread(messageData.threadId));
+
+                    if(threads.getThread(messageData.threadId).get("is_monitored"))
+                        Updater.runMonitoring(threads.getThread(messageData.threadId));
                 }
 
                 MainActor.become(actorReceive(threads, /*{thread_opened: false}*/state));
@@ -544,7 +554,9 @@ function actorReceive(threads, state) {
 
                     updateCounter(threads);
                     MainActor.become(actorReceive(threads, state));
-                    Updater.runMonitoring(threads.getThread(threadData.threadId));
+
+                    if(threads.getThread(threadData.threadId).get("is_monitored"))
+                        Updater.runMonitoring(threads.getThread(threadData.threadId));
                 }
 
                 state = MainActor.stateRemoveTab(state, sender.tab.windowId, sender.tab.id);
@@ -648,7 +660,8 @@ function actorReceive(threads, state) {
                                 threads.getThread(threadId)
                             )));
 
-                    Updater.runMonitoring(threads.getThread(threadId), threads.getThread(threadId).get("delay"));
+                    if(threads.getThread(threadId).get("is_monitored"))
+                        Updater.runMonitoring(threads.getThread(threadId), threads.getThread(threadId).get("delay"));
 
                     updateCounter(threads);
                     MainActor.receive("popup-request", {}, responseCallback);
@@ -672,10 +685,11 @@ function actorReceive(threads, state) {
                             )
                         );
 
-                        Updater.runMonitoring(
-                            threads.getThread(num),
-                            threads.getThread(num).get("delay")
-                        );
+                        if(threads.getThread(num).get("is_monitored"))
+                            Updater.runMonitoring(
+                                threads.getThread(num),
+                                threads.getThread(num).get("delay")
+                            );
                     }
                 }
 
@@ -695,10 +709,38 @@ function actorReceive(threads, state) {
 
                 chrome.tabs.query({}, function(tabs) {
                     for (var i=0; i<tabs.length; ++i) {
-                        console.log(tabs[i]);
                         chrome.tabs.sendMessage(tabs[i].id, threads.getAll().toObject());
                     }
                 });
+
+                break;
+
+            case "stop-monitoring":
+
+                threadId = messageData.threadId;
+
+                if(threads.has(threadId)) {
+                    Scheduler.unscheduleTask(threadId);
+                    threads = threads.pushThread(threads.getThread(threadId).set('is_monitored', false));
+                }
+
+                MainActor.become(actorReceive(threads, state));
+                MainActor.receive("popup-request", {}, responseCallback);
+
+                break;
+
+            case "start-monitoring":
+
+                threadId = messageData.threadId;
+
+                if(threads.has(threadId)) {
+                    Scheduler.unscheduleTask(threadId);
+                    threads = threads.pushThread(threads.getThread(threadId).set('is_monitored', true));
+                    Updater.runMonitoring(threads.getThread(threadId));
+                }
+
+                MainActor.become(actorReceive(threads, state));
+                MainActor.receive("popup-request", {}, responseCallback);
 
                 break;
         }
@@ -797,36 +839,26 @@ function initListener() {
                  * реквесты из popup.html
                  * */
 
-                case "popup-markasread":
-                    MainActor.receive("popup-markasread", request.data, function(thds, state) {
-                        sendResponse({threads: thds.getAllAsObjects(), state: state});
-                    });
+              case "popup-markasread":
+                MainActor.receive("popup-markasread", request.data, function(thds, state) {
+                    sendResponse({threads: thds.getAllAsObjects(), state: state});
+                });
                 break;
 
-                case "popup-update":
-/*
-                    Monitor.log("popup-update");
-                    var num = request.data.num;
+              case "stop-monitoring":
+                  MainActor.receive("stop-monitoring", request.data, function(thds, state) {
+                      sendResponse({threads: thds.getAllAsObjects(), state: state});
+                  });
+                  break;
 
-                    if(Threads.has(num)) {
-                        Scheduler.unscheduleTask(num);
-                        Updater.runMonitoring(
-                            Threads.pushThread(
-                                    Updater.getUpdatedThread(
-                                        Threads.getThread(num)
-                                    )),
-                            Threads.getThread(num).get("delay")
-                        );
-                        updateCounter();
-                        sendResponse({threads: Threads.getAllAsObjects()})
-                    }
-*/
-                break;
+              case "start-monitoring":
+                  MainActor.receive("start-monitoring", request.data, function(thds, state) {
+                      sendResponse({threads: thds.getAllAsObjects(), state: state});
+                  });
+                  break;
 
               case "popup-request":
                   Monitor.log("Got popup-request");
-
-                  console.log(sendResponse);
 
                   MainActor.receive("popup-request", {}, function(thds, state) {
                       console.log(sendResponse);
