@@ -5,14 +5,13 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 	<style type="text/css">
 
-		a:hover,
-		.a-link-emulator:hover {
-			color: #0066FF;
-		}
-
 		a.thread-link {
-
+            color: #FF6600;
 		}
+
+        a.thread-link:hover {
+            color: #0066FF;
+        }
 
 		a.thread-link.unread {
 			font-weight: bold;
@@ -41,6 +40,20 @@
             margin: 0 !important;
         }
 
+        div.clicking {
+            cursor: pointer;
+            cursor: hand;
+        }
+
+        div.inactive {
+            color: lightgray
+        }
+
+/*
+        div.clicking:hover {
+            background-color: #aaaaaa;
+        }
+*/
 
 	</style>
 	<link rel="stylesheet" href="css/bootstrap.min.css">
@@ -49,10 +62,43 @@
     <style>
 
         .container {
-            width: 600px;
+            width: 520px;
             max-width: none !important;
         }
 
+        body {
+            width: 520px;
+            padding-left: 0px;
+            margin-left: 0px;
+
+            margin-bottom: 5px;
+            margin-top: 5px;
+            margin-right: 5px;
+
+            overflow: hidden;
+            background-color: #eeeeee
+        }
+
+        body.empty {
+            background-image:url('images/1317132416.png');
+            background-size: cover;
+            background-position: 40% 27%;
+        }
+
+        .showme {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            padding-top: 15px;
+            height: 100%;
+            background-color: #eeeeee;
+            z-index:99;
+        }
+        .showhim:hover .showme {
+            display : block;
+
+        }
     </style>
 
 	<script src="libs/angular.min.js"></script>
@@ -62,88 +108,118 @@
 
 </head>
 
-<body style="width: 600px; padding: 0; margin: 0; overflow: hidden;" ng-controller="threadsListCtrl">
+<body ng-controller="threadsListCtrl" ng-class="{'body empty': !(threads | toArray).length}">
 
 <div class="container">
     <div class="row">
         <div class="col-xs-11">
-            <!--<span ng-repeat="thread in threads | toArray | orderBy:'-unread'">-->
-                <div class="row" ng-repeat="thread in threads | toArray | orderBy:'-unread' | orderBy:'-is_monitored'">
-                    <div class="col-xs-1">
-                        <div class="dropdown">
-                            <button class="dropdown-toggle" type="button" ng-attr-id="{{ 'dropdownMenu' + thread.num }}" data-toggle="dropdown" aria-expanded="true">
-                                <span ng-if="thread.unread > 0">
-                                    <p style="font-size:10px; font-weight: bold;">{{thread.unread}}</p>
-                                </span>
-                                <span ng-if="thread.unread == 0">
-                                    <span class="caret"></span>
-                                </span>
-                            </button>
-
-                            <ul class="dropdown-menu" role="menu" aria-labelledby="{{ 'dropdownMenu' + thread.num }}">
-
-                                <li role="presentation" ng-if="thread.unread > 0">
-                                    <a data-ng-click="markThreadAsRead(thread.num)" role="menuitem" tabindex="-1" href="#">
-                                        <span class="glyphicon glyphicon-ok" aria-hidden="true"></span>
-                                        Отметить прочитанным
-                                    </a>
-                                </li>
-
-                                <li role="presentation">
-                                    <a data-ng-click="stopMonitoring(thread.num)" role="menuitem" tabindex="-1" href="#" ng-if="thread.is_monitored">
-                                        <span class="glyphicon glyphicon-pause" aria-hidden="true"></span>
-                                        Не мониторить
-                                    </a>
-                                    <a data-ng-click="startMonitoring(thread.num)" role="menuitem" tabindex="-1" href="#" ng-if="!thread.is_monitored">
-                                        <span class="glyphicon glyphicon-play" aria-hidden="true"></span>
-                                        Начать мониторить
-                                    </a>
-                                </li>
-
-                                <li role="presentation">
-                                    <a data-ng-click="deleteThread(thread.num)" role="menuitem" tabindex="-1" href="#">
-                                        <span class="glyphicon glyphicon-remove" aria-hidden="true"></span>
-                                        Удалить
-                                    </a>
-                                </li>
-                            </ul>
+            <div class="row" ng-repeat="thread in threads | toArray | orderBy:['-unread','-is_monitored','not_found_errors']">
+                <div class="col-xs-1 text-right" style="padding-right: 10px; padding-left: 0px">
+                    <div class="dropdown">
+                        <div class="dropdown-toggle clicking text-right" ng-attr-id="{{ 'dropdownMenu' + thread.num }}" data-toggle="dropdown" aria-expanded="true">
+                            <span ng-if="thread.unread > 0">
+                                <span style="font-size:10px; font-weight: bold;">{{thread.unread}}</span>
+                            </span>
+                            <span ng-if="thread.unread == 0">
+                                <span style="font-size:8px; font-weight: bold;" class="glyphicon glyphicon-triangle-bottom"></span>
+                            </span>
                         </div>
-                    </div>
-                    <div class="col-xs-11 link-div">
-                        <a
-                                ng-attr-href="{{'https://2ch.hk/' + thread.board + '/res/' + thread.num + '.html#' + thread.first_unread}}"
-                                ng-class="{
-                                    'thread-link unread' : thread.unread > 0,
-                                    'thread-link' : thread.unread <= 0,
-                                    'thread-link notmonitored': !thread.is_monitored,
-                                    'thread-link notfound': thread.not_found_errors > 0,
-                                    'thread-link error': thread.errors > 0
-                                }">
-                                <!--ng-class="thread.unread > 0 ? 'thread-link unread' : 'thread-link'"-->
-                                <!--ng-style="thread.is_monitored ? '' : 'color: gray'">-->
 
-                            /{{thread.board}}/{{thread.num}} {{thread.title}}
-                        </a>
+                        <ul class="dropdown-menu" role="menu" aria-labelledby="{{ 'dropdownMenu' + thread.num }}">
+
+                            <li role="presentation" ng-if="thread.unread > 0">
+                                <a data-ng-click="markThreadAsRead(thread.num)" role="menuitem" tabindex="-1" href="#">
+                                    <span class="glyphicon glyphicon-ok" aria-hidden="true"></span>
+                                    Отметить прочитанным
+                                </a>
+                            </li>
+
+                            <li role="presentation">
+                                <a data-ng-click="toggleMonitoring(thread.num)" role="menuitem" tabindex="-1" href="#" ng-if="thread.is_monitored">
+                                    <span class="glyphicon glyphicon-pause" aria-hidden="true"></span>
+                                    Не мониторить
+                                </a>
+                                <a data-ng-click="toggleMonitoring(thread.num)" role="menuitem" tabindex="-1" href="#" ng-if="!thread.is_monitored">
+                                    <span class="glyphicon glyphicon-play" aria-hidden="true"></span>
+                                    Начать мониторить
+                                </a>
+                            </li>
+
+                            <li role="presentation">
+                                <a data-ng-click="deleteThread(thread.num)" role="menuitem" tabindex="-1" href="#">
+                                    <span class="glyphicon glyphicon-remove" aria-hidden="true"></span>
+                                    Удалить
+                                </a>
+                            </li>
+                        </ul>
                     </div>
                 </div>
-            <!--</span>-->
+                <div class="col-xs-11 link-div text-left nopadding">
+                    <a
+                            ng-attr-href="{{'https://2ch.hk/' + thread.board + '/res/' + thread.num + '.html#' + thread.first_unread}}"
+                            ng-class="{
+                                'thread-link unread' : thread.unread > 0,
+                                'thread-link' : thread.unread <= 0,
+                                'thread-link notmonitored': !thread.is_monitored,
+                                'thread-link notfound': thread.not_found_errors > 0,
+                                'thread-link error': thread.errors > 0
+                            }"
+                            ng-hover-keydown="linkKeyPress(thread.num)">
+
+                        /{{thread.board}}/{{thread.num}} {{thread.title}}
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-xs-11 showme" style="text-align: justify">
+            Хорошо, что ты догадался навести мышку на знак вопросика, который скорее всего был едва заметен
+            из-за йобы, которого я решил вставить фоном, и теперь можешь узнать, что хелп открывается именно так. Добавлять и
+            удалять треды теперь можно как со страницы
+            двача (звездочка в оп-посте), так и здесь. Добавляется тред с помощью плюса справа от этой надписи.
+            Удаляется с помощью менюшки слева от треда в списке. Если плюс внезапно неактивен, хотя ты сидишь в треде, то
+            скорее всего тред еще не загрузился до конца или уже добавлен. Кроме того доступны хоткеи при наведении мышкой на ссылку
+            треда: <i>Delete</i> - удалить, <i>Enter</i> - отметить прочитанным, <i>пробел</i> - остановить или запустить мониторинг. Вот и все.
+            Исходники как всегда на /dvachtools/dvachmonitor @ github. Алсо разыскивается кто-нибудь, кто сможет
+            запилить нормальный интерфейс для приложения.
         </div>
         <div class="col-xs-1">
             <div class="row">
-                <button class="dropdown-toggle" type="button" data-ng-click="checkAllThreads()">
-                    <span class="glyphicon glyphicon-repeat" aria-hidden="true"></span>
-                </button>
+                <div class="dropdown-toggle inactive text-right" ng-if="!(threads | toArray).length">
+                    <span class="glyphicon glyphicon-repeat" aria-hidden="true" title="Обновить все"></span>
+                </div>
+                <div class="dropdown-toggle inactive text-right" ng-if="checkingAll">
+                    <span class="glyphicon glyphicon-repeat" aria-hidden="true" title="Обновить все"></span>
+                </div>
+                <div class="dropdown-toggle clicking text-right" data-ng-click="checkAllThreads()" ng-if="(threads | toArray).length && !checkingAll">
+                    <span class="glyphicon glyphicon-repeat" aria-hidden="true" title="Обновить все"></span>
+                </div>
             </div>
+
             <div class="row" ng-if="state.addable">
-                <button class="dropdown-toggle" type="button" data-ng-click="addCurrentThread()">
-                    <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-                </button>
+                <div class="clicking text-right" data-ng-click="addCurrentThread()">
+                    <span class="glyphicon glyphicon-plus" aria-hidden="true"  title="Добавить '{{state.threadData.title}}'"></span>
+                </div>
             </div>
+            <div class="row" ng-if="!state.addable">
+                <div class="text-right inactive">
+                    <span class="glyphicon glyphicon-plus" aria-hidden="true"  title="Добавить"></span>
+                </div>
+            </div>
+
             <div class="row">
-                <button class="dropdown-toggle" type="button">
-                    <span class="glyphicon glyphicon-question-sign" aria-hidden="true"></span>
-                </button>
+                <ol style="visibility:hidden;"></ol>
             </div>
+
+            <div class="row">
+                <div class="text-right">
+                    <span class="glyphicon glyphicon-question-sign showhim" aria-hidden="true"></span>
+                </div>
+            </div>
+<!--            <div class="row">
+                <div class="dropdown-toggle clicking text-right" data-ng-click="importFavorites()">
+                    <span class="glyphicon glyphicon-import" aria-hidden="true" title="Импортировать избранное"></span>
+                </div>
+            </div>-->
         </div>
     </div>
 </div>
@@ -151,8 +227,6 @@
 <script type="text/javascript" src="libs/underscore.js"></script>
 <script type="text/javascript" src="libs/jquery-2.1.1.js"></script>
 <script type="text/javascript" src="libs/bootstrap.min.js"></script>
-<script type="text/javascript" src="libs/sprintf.js"></script>
-<!--<script type="text/javascript" src="old_popup.js"></script>-->
 </body>
 
 </html>

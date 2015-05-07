@@ -21,12 +21,12 @@ var Monitor = {
 };
 
 var Storage = {
-    saveThreads: function() {
+    saveThreads: function(threads) {
         chrome.storage.local.set(
             {
                 "dvachmon": {
                     settings: Settings,
-                    threads: Threads.getAllAsObjects()
+                    threads: threads.getAllAsObjects()
                 }
             },
             function(){
@@ -160,7 +160,7 @@ var ThreadsProto = {
 
     /** @returns {ThreadsProto}*/
     loadFromObjects: function(threadsObject) {
-        //updateCounter();
+        //updateViews();
         return this.fromThreadsMap(Immutable.fromJS(threadsObject));
     },
 
@@ -293,32 +293,8 @@ var Updater = {
         Scheduler.scheduleTask(
             threadMap.get('num'),
             function() {
-
                 var checkResult = self.getUpdates(threadMap);
                 MainActor.receive("thread-checked", {thread: threadMap, result: checkResult, delay: delay});
-                /*var applied = self.applyResultToThread(threadMap, checkResult); // новый объект треда
-
-                if(checkResult.unread > 0) {
-                    self.runMonitoring(
-                        Threads.pushThread (
-                            applied.set("delay", Settings.minimumDelay) // если есть новые сообщения, то следующая
-                            // проверка будет через минимальное кол-во времени
-                        ), Settings.minimumDelay);
-
-                    updateCounter();
-
-                } else {    // иначе запускаем с увеличенной задержкой
-
-                    var newDelay = self.getUpdateDelay(_.isUndefined(delay) ? Settings.minimumDelay : delay);
-
-                    assert(!_.isNaN(newDelay), "ebal ruka");
-
-                    self.runMonitoring(
-                        Threads.pushThread(applied.set("delay", newDelay)),
-                        newDelay
-                    );
-                }*/
-
             },
             _.isUndefined(delay) ? Settings.minimumDelay : delay
         )},
@@ -430,8 +406,7 @@ function actorReceive(threads, state) {
                 }
 
                 MainActor.become(actorReceive(threads, state));
-
-                MainActor.receive("update-content-script");
+                updateViews(threads);
 
                 responseCallback();
 
@@ -453,7 +428,7 @@ function actorReceive(threads, state) {
 
                      Updater.runMonitoring(thread, Settings.minimumDelay);
 
-                     updateCounter(threads);
+                     updateViews(threads);
 
                  } else {    // иначе запускаем с увеличенной задержкой
 
@@ -484,7 +459,7 @@ function actorReceive(threads, state) {
                             messageData.last_post)
                     );
 
-                    updateCounter(threads);
+                    updateViews(threads);
                 }
 
                 MainActor.become(actorReceive(threads, state));
@@ -504,7 +479,7 @@ function actorReceive(threads, state) {
                         )
                     );
 
-                    updateCounter(threads);
+                    updateViews(threads);
 
                     if(threads.getThread(messageData.threadId).get("is_monitored"))
                         Updater.runMonitoring(threads.getThread(messageData.threadId));
@@ -529,7 +504,7 @@ function actorReceive(threads, state) {
                             threads.getThread(threadData.threadId),
                             threadData.last_post)
                     );
-                    updateCounter(threads);
+                    updateViews(threads);
                 }
 
                 state = MainActor.stateAddTab(state, sender.tab.windowId, sender.tab.id, threadData);
@@ -552,7 +527,7 @@ function actorReceive(threads, state) {
                             threadData.last_post)
                     );
 
-                    updateCounter(threads);
+                    updateViews(threads);
                     MainActor.become(actorReceive(threads, state));
 
                     if(threads.getThread(threadData.threadId).get("is_monitored"))
@@ -565,9 +540,6 @@ function actorReceive(threads, state) {
 
                 break;
 
-            case "storage-favorites":
-                break;
-
             case "add-thread":
 
                 threads = threads.pushThread(
@@ -578,7 +550,7 @@ function actorReceive(threads, state) {
                         messageData.last_post
                 ));
 
-                updateCounter(threads);
+                updateViews(threads);
 
                 if(!_.isUndefined(messageData.from_main) && messageData.from_main)
                     Updater.runMonitoring(threads.getThread(messageData.threadId));
@@ -588,13 +560,6 @@ function actorReceive(threads, state) {
                 break;
 
             case "add-current-thread":
-
-/*                if(state.thread_opened && !threads.has(state.current_thread.threadId)) {
-                    MainActor.receive("add-thread", state.current_thread, responseCallback);
-                } else {
-                    Monitor.log("No current thread :(");
-                    responseCallback(threads, state);
-                }*/
 
                 MainActor.receive("popup-request", {}, function(thds, current){
                     if(current.addable) {
@@ -615,7 +580,7 @@ function actorReceive(threads, state) {
 
                     Scheduler.unscheduleTask(messageData.threadId);
                     threads = threads.deleteThread(messageData.threadId);
-                    updateCounter(threads);
+                    updateViews(threads);
                     MainActor.become(actorReceive(threads, state));
                 }
                 //responseCallback(threads, state);
@@ -663,7 +628,7 @@ function actorReceive(threads, state) {
                     if(threads.getThread(threadId).get("is_monitored"))
                         Updater.runMonitoring(threads.getThread(threadId), threads.getThread(threadId).get("delay"));
 
-                    updateCounter(threads);
+                    updateViews(threads);
                     MainActor.receive("popup-request", {}, responseCallback);
                 }
 
@@ -693,7 +658,7 @@ function actorReceive(threads, state) {
                     }
                 }
 
-                updateCounter(threads);
+                updateViews(threads);
                 MainActor.become(actorReceive(threads, state));
                 MainActor.receive("popup-request", {}, responseCallback);
 
@@ -741,6 +706,62 @@ function actorReceive(threads, state) {
 
                 MainActor.become(actorReceive(threads, state));
                 MainActor.receive("popup-request", {}, responseCallback);
+
+                break;
+
+            case "toggle-monitoring":
+
+                threadId = messageData.threadId;
+
+                if(threads.has(threadId)) {
+                    if(threads.getThread(threadId).get('is_monitored')) {
+                        MainActor.receive("stop-monitoring", messageData, responseCallback);
+                    } else {
+                        MainActor.receive("start-monitoring", messageData, responseCallback);
+                    }
+                }
+
+                break;
+
+            case "save-threads":
+
+                Storage.saveThreads(threads);
+
+                break;
+
+            case "storage-favorites":
+
+                var favs = messageData;
+
+                 var newFavsNums = _.filter(
+                     Object.keys(favs),
+                     function(key) {
+                        return !threads.has(key) && !(favs[key].title == undefined);
+                    }
+                 );
+
+                 _.forEach(newFavsNums, function(num){
+                     var fav = favs[num];
+                     MainActor.receive("add-thread", {
+                         threadId: num,
+                         board: fav.board,
+                         title: fav.title,
+                         last_post: fav.last_post
+                     }, function(t,s){});
+                 });
+
+                MainActor.receive("popup-request", {}, function(thds, state) {
+
+                    chrome.runtime.sendMessage(
+                        {
+                            type: "push-to-popup",
+                            data: {
+                                threads: thds.getAllAsObjects(),
+                                state: state
+                            }
+                        }
+                    );
+                });
 
                 break;
         }
@@ -799,29 +820,15 @@ function initListener() {
                  * Подгружает избранное с двоща. Добавляет только то, чего еще нет в Threads
                  * */
                 case "storage-favorites":
-/*                    Monitor.log("storage-favorites");
+                    Monitor.log("storage-favorites");
                     Monitor.log(request.data);
-
-                    var favs = request.data;
-
-                    var newFavsNums = _.filter(
-                        Object.keys(favs),
-                        function(key) {
-                            return !Threads.has(key) && !(favs[key].title == undefined);
-                        });
-
-                    _.forEach(newFavsNums, function(num){
-                        var fav = favs[num];
-                        Updater.runMonitoring(
-                            Threads.pushThread(
-                                Threads.createThread(num, fav.board, fav.title, fav.last_post)
-                            ),
-                            0
-                        );
-                    });
-
-                    Monitor.log(newFavsNums);*/
+                    MainActor.receive("storage-favorites", request.data);
                 break;
+
+                  case "dvach-loaded":
+                      Monitor.log("dvach-loaded");
+                      MainActor.receive("dvach-loaded");
+                      break;
 
               /**
                *  реквесты из hook.js
@@ -845,14 +852,8 @@ function initListener() {
                 });
                 break;
 
-              case "stop-monitoring":
-                  MainActor.receive("stop-monitoring", request.data, function(thds, state) {
-                      sendResponse({threads: thds.getAllAsObjects(), state: state});
-                  });
-                  break;
-
-              case "start-monitoring":
-                  MainActor.receive("start-monitoring", request.data, function(thds, state) {
+              case "toggle-monitoring":
+                  MainActor.receive("toggle-monitoring", request.data, function(thds, state) {
                       sendResponse({threads: thds.getAllAsObjects(), state: state});
                   });
                   break;
@@ -898,6 +899,17 @@ function initListener() {
                   );
 
               break;
+
+              case "import-favorites":
+                  Monitor.log("import-favorites");
+
+                  chrome.tabs.query({'active': true, 'lastFocusedWindow': true}, function(tabs) {
+                    if(tabs.length > 0) {
+                        chrome.tabs.sendMessage(tabs[0].id, "send-me-favorites-please");
+                    }
+                  });
+
+                  break;
             }
 
             return true;
@@ -905,9 +917,10 @@ function initListener() {
     )
 }
 
-function updateCounter(threads) {
+function updateViews(threads) {
 
     MainActor.receive("update-content-script");
+    MainActor.receive("save-threads");
 
     threads = threads.getAllAsObjects();
     var totalUnreads = 0;

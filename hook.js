@@ -1,32 +1,23 @@
-if(window.thread.id) {
-
-    var data = {
-        board: window.thread.board, 
-        threadId: window.thread.id, 
-        last_post: window.Post.call(window, window.thread.id).last().num,
-        title: window.Post.call(window, window.thread.id).getTitle()
-    };
-
-    window.postMessage({ type: "thread-loaded", data: data }, "*");
-}
-
-// отправляем избранное ублюдня
-window.postMessage({ type: "storage-favorites", data: JSON.parse(localStorage["store"]).favorites}, "*");
-
 var favoritedThreads = [];
 
 window.addEventListener('message', function(event) {
     if (event.data && event.data.extensionMessage) {
-        favoritedThreads = Object.keys(event.data.extensionMessage);
 
-        $('.thread').each(function(el){
-             var num = $(this).attr('id').substr(7);
-             if(Favorites.isFavorited(num)) {
-                 Favorites.render_switch(num, true);
-             } else {
-                 Favorites.render_switch(num, false);
-             }
-         });
+        if(event.data.extensionMessage == "send-me-favorites-please")
+            window.postMessage({ type: "storage-favorites", data: JSON.parse(localStorage["store"]).favorites}, "*");
+        else
+        {
+            favoritedThreads = Object.keys(event.data.extensionMessage);
+
+            $('.thread').each(function (el) {
+                var num = $(this).attr('id').substr(7);
+                if (Favorites.isFavorited(num)) {
+                    Favorites.render_switch(num, true);
+                } else {
+                    Favorites.render_switch(num, false);
+                }
+            });
+        }
     }
 });
 
@@ -67,44 +58,38 @@ Favorites.isFavorited = function(num) {
 });*/
 
 // всякие ссаки
-window.addEventListener('focus', function() {
-    if(!window.thread.id) return;
-    console.log("focus");
-    var data = {
-        board: window.thread.board, 
-        threadId: window.thread.id, 
+
+function getCurrentThread() {
+    return  {
+        board: window.thread.board,
+        threadId: window.thread.id,
         last_post: window.Post.call(window, window.thread.id).last().num,
         title: window.Post.call(window, window.thread.id).getTitle()
     };
-    window.postMessage({ type: "window-focused", data: data }, "*");
+}
+
+if(window.thread.id) {
+    window.postMessage({ type: "thread-loaded", data: getCurrentThread() }, "*");
+}
+
+if(!window.thread.id) {
+    window.postMessage({ type: "dvach-loaded" }, "*");
+}
+
+window.addEventListener('focus', function() {
+    if(!window.thread.id) return;
+    console.log("focus");
+    window.postMessage({ type: "window-focused", data: getCurrentThread() }, "*");
 });
 
 window.addEventListener('blur', function() {
     if(!window.thread.id) return;
-
     console.log(window.thread.id);
-
-    var data = {
-        board: window.thread.board, 
-        threadId: window.thread.id, 
-        last_post: window.Post.call(window, window.thread.id).last().num,
-        title: window.Post.call(window, window.thread.id).getTitle()
-    };
-
-    window.postMessage({ type: "window-blured", data: data }, "*");
+    window.postMessage({ type: "window-blured", data: getCurrentThread() }, "*");
 });
 
 window.addEventListener('beforeunload', function() {
     if(!window.thread.id) return;
-
     console.log(window.thread.id);
-
-    var data = {
-        board: window.thread.board, 
-        threadId: window.thread.id, 
-        last_post: window.Post.call(window, window.thread.id).last().num,
-        title: window.Post.call(window, window.thread.id).getTitle()
-    };
-
-    window.postMessage({ type: "window-unload", data: data }, "*");
+    window.postMessage({ type: "window-unload", data: getCurrentThread() }, "*");
 });

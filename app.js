@@ -10,10 +10,50 @@ phonecatApp.filter("toArray", function(){
     };
 });
 
-phonecatApp.controller('threadsListCtrl', function ($scope) {
+phonecatApp.directive('ngHoverKeydown', ['$document', function ($document) {
+    return {
+        restrict: 'A',
+        scope: {method: '&ngHoverKeydown'},
+
+        link: function ($scope, element, attrs) {
+
+            var expressionHandler = $scope.method();
+
+            element.bind("mouseover", function (event) {
+                $document.bind("keypress", function (event) {
+                    expressionHandler(event.which);
+                });
+            });
+
+            element.bind("mouseout", function (event) {
+                $document.unbind("keypress");
+            });
+
+        }
+    };
+}]);
+
+phonecatApp.controller('threadsListCtrl', function ($scope, $document) {
 
     $scope.threads = {};
     $scope.state = {};
+    $scope.checkingAll = false;
+
+    $scope.linkKeyPress = function(threadId) {
+        return function(key) {
+            switch(key) {
+                case 13:
+                    $scope.markThreadAsRead(threadId);
+                    break;
+                case 127:
+                    $scope.deleteThread(threadId);
+                    break;
+                case 32:
+                    $scope.toggleMonitoring(threadId);
+                    break;
+            }
+        }
+    };
 
     $scope.update = function(threads, state) {
         $scope.threads = threads;
@@ -33,7 +73,10 @@ phonecatApp.controller('threadsListCtrl', function ($scope) {
     };
 
     $scope.checkAllThreads = function() {
+        $scope.checkingAll = true;
+        $scope.$apply();
         chrome.runtime.sendMessage({ type: "popup-update-all" }, function(response) {
+            $scope.checkingAll = false;
             $scope.update(response.threads, response.state);
         });
     };
@@ -58,17 +101,24 @@ phonecatApp.controller('threadsListCtrl', function ($scope) {
         });
     };
 
-    $scope.stopMonitoring = function(threadId) {
-        chrome.runtime.sendMessage({ type: "stop-monitoring", data: {threadId: threadId} }, function(response) {
+    $scope.toggleMonitoring = function(threadId) {
+        chrome.runtime.sendMessage({ type: "toggle-monitoring", data: {threadId: threadId} }, function(response) {
             $scope.update(response.threads, response.state);
         });
     };
 
-    $scope.startMonitoring = function(threadId) {
-        chrome.runtime.sendMessage({ type: "start-monitoring", data: {threadId: threadId} }, function(response) {
+    $scope.importFavorites = function(){
+        chrome.runtime.sendMessage({ type: "import-favorites"}, function(response) {
             $scope.update(response.threads, response.state);
         });
     };
+
+    chrome.runtime.onMessage.addListener(
+        function(request, sender, sendResponse) {
+            if(request.type && request.type == "push-to-popup" && request.data) {
+                $scope.update(request.data.threads, request.data.state);
+            }
+        });
 
     $scope.updateView();
 
